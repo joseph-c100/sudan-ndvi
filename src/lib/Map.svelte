@@ -90,7 +90,11 @@
 		active = id;
 		if (!map) return;
 		for (const layer of layers) {
-			map.setLayoutProperty(`ndvi-${layer.id}-layer`, 'visibility', layer.id === id ? 'visible' : 'none');
+			map.setLayoutProperty(
+				`ndvi-${layer.id}-layer`,
+				'visibility',
+				layer.id === id ? 'visible' : 'none'
+			);
 		}
 	}
 
@@ -115,18 +119,23 @@
 		const y1 = latToTileY(south, z);
 		for (let x = x0; x <= x1; x++) {
 			for (let y = y0; y <= y1; y++) {
-				urls.push(tileUrl.replace('{z}', String(z)).replace('{x}', String(x)).replace('{y}', String(y)));
+				urls.push(
+					tileUrl.replace('{z}', String(z)).replace('{x}', String(x)).replace('{y}', String(y))
+				);
 			}
 		}
 		return urls;
 	}
 
 	// fetch every tile with a bounded pool so the browser cache is warm before
-	// the user interacts. all layers are cached so toggling is instant too.
-	// failures are ignored — a missing tile just isn't cached.
-	async function warmTileCache() {
-		const urls = layers.flatMap((layer) => tileUrlsForBounds(layer.tileUrl));
-		total = urls.length;
+	// the user interacts. failures are ignored — a missing tile just isn't cached.
+	// `track` drives the splash progress; pass false for silent background warming.
+	async function warmTileCache(targetLayers: NdviLayer[], track = true) {
+		const urls = targetLayers.flatMap((layer) => tileUrlsForBounds(layer.tileUrl));
+		if (track) {
+			cached = 0;
+			total = urls.length;
+		}
 		let next = 0;
 		const workers = Array.from({ length: 12 }, async () => {
 			while (next < urls.length) {
@@ -138,7 +147,7 @@
 				} catch {
 					// ignore individual tile failures
 				}
-				cached++;
+				if (track) cached++;
 			}
 		});
 		await Promise.all(workers);
@@ -160,7 +169,9 @@
 				// restrict panning and zoom-out to the area of interest
 				maxBounds: bounds,
 				// disable the global tile crossfade for snappier zooming
-				fadeDuration: 0
+				fadeDuration: 0,
+				// ndvi tiles are immutable, so never re-request expired ones
+				refreshExpiredTiles: false
 			});
 
 			if (minimap) {
@@ -223,7 +234,12 @@
 					source: 'towns',
 					layout: {
 						'text-field': ['get', 'name'],
-						'text-font': ['case', ['get', 'capital'], ['literal', ['Open Sans Bold']], ['literal', ['Open Sans Regular']]],
+						'text-font': [
+							'case',
+							['get', 'capital'],
+							['literal', ['Open Sans Bold']],
+							['literal', ['Open Sans Regular']]
+						],
 						'text-size': ['case', ['get', 'capital'], 13, 11],
 						'text-anchor': 'top',
 						'text-offset': [0, 0.6],
@@ -260,11 +276,17 @@
 			// warm the tile cache, then lift the splash. run it after the map has
 			// been created so both proceed in parallel.
 			if (preload) {
+				const activeLayer = layers.find((l) => l.id === active);
 				try {
-					await warmTileCache();
+					// only the visible layer gates the splash
+					await warmTileCache(activeLayer ? [activeLayer] : layers);
 				} finally {
 					loading = false;
 				}
+				// warm the remaining layers in the background so toggling stays
+				// instant without holding up the splash
+				const rest = layers.filter((l) => l.id !== active);
+				if (rest.length) warmTileCache(rest, false);
 			}
 		})();
 
@@ -298,7 +320,11 @@
 			<div class="bar">
 				<div class="bar-fill" style="width: {progress}%"></div>
 			</div>
-			<p class="splash-count">{progress}%{#if total > 0}<span class="splash-detail"> · {cached} / {total} tiles</span>{/if}</p>
+			<p class="splash-count">
+				{progress}%{#if total > 0}<span class="splash-detail">
+						· {cached} / {total} tiles</span
+					>{/if}
+			</p>
 		</div>
 	</div>
 {/if}
@@ -316,8 +342,6 @@
 		z-index: 5;
 		display: flex;
 		background: #fff;
-		border-radius: 6px;
-		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 		overflow: hidden;
 		font-family:
 			system-ui,
