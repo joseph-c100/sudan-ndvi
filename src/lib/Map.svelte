@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { base } from '$app/paths';
 	import type { Map as MapLibreMap, LngLatBoundsLike } from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import { towns, countryLabel } from './towns';
@@ -192,7 +193,7 @@
 				}
 
 				// sudan national boundary (bundled geojson served from static/)
-				map!.addSource('sudan', { type: 'geojson', data: '/sudan-adm0.geojson' });
+				map!.addSource('sudan', { type: 'geojson', data: `${base}/sudan-adm0.geojson` });
 				map!.addLayer({
 					id: 'sudan-boundary',
 					type: 'line',
