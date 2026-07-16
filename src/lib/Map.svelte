@@ -29,6 +29,8 @@
 		bounds?: LngLatBoundsLike;
 		// show the overview minimap in the corner
 		minimap?: boolean;
+		// show the legend / layer-explainer box above the minimap
+		info?: boolean;
 		// warm the browser tile cache in the background so panning/toggling is
 		// instant. set preload={false} to skip.
 		preload?: boolean;
@@ -68,6 +70,7 @@
 			[40.957031, 23.402765]
 		],
 		minimap = true,
+		info = true,
 		preload = true,
 		// only cache the base level; higher levels are fetched on demand
 		preloadZoom = 7
@@ -210,8 +213,8 @@
 					type: 'circle',
 					source: 'towns',
 					paint: {
-						'circle-radius': ['case', ['get', 'capital'], 5, 3],
-						'circle-color': '#c0392b',
+						'circle-radius': ['case', ['get', 'capital'], 6, 4],
+						'circle-color': '#000',
 						'circle-stroke-color': '#fff',
 						'circle-stroke-width': 1
 					}
@@ -294,6 +297,18 @@
 	</div>
 {/if}
 
+{#if info}
+	<div class="info" class:above-minimap={minimap}>
+		<p class="info-title">Median vegetation and farmland change before and during conflict</p>
+		<p class="info-key-title">Change key</p>
+		<div class="info-key-bar" aria-hidden="true"></div>
+		<div class="info-key-labels">
+			<span>Loss</span>
+			<span>Gain</span>
+		</div>
+	</div>
+{/if}
+
 <style>
 	.map {
 		width: 100%;
@@ -337,5 +352,63 @@
 	.toggle-btn.active {
 		background: #000;
 		color: #fff;
+	}
+
+	.info {
+		position: absolute;
+		left: 10px;
+		bottom: 10px;
+		z-index: 5;
+		width: 200px;
+		box-sizing: border-box;
+		padding: 0.6rem 0.7rem;
+		background: #fff;
+		border: 1px solid #000;
+		font-family:
+			system-ui,
+			-apple-system,
+			sans-serif;
+		font-size: 0.72rem;
+		line-height: 1.35;
+		color: #1a1a1a;
+	}
+
+	/* lift above the 150px-tall minimap (plus its 10px margin and a gap) */
+	.info.above-minimap {
+		bottom: 170px;
+	}
+
+	.info-title {
+		margin: 0 0 0.4rem;
+		font-size: 0.8rem;
+		font-weight: 700;
+	}
+
+	.info-layers {
+		margin: 0 0 0.55rem;
+		padding-left: 0.9rem;
+	}
+
+	.info-layers li {
+		margin-bottom: 0.2rem;
+	}
+
+	.info-key-title {
+		margin: 0 0 0.3rem;
+		font-weight: 700;
+	}
+
+	.info-key-bar {
+		height: 10px;
+		border: 1px solid #000;
+		/* red = loss, through neutral, to green = gain */
+		background: linear-gradient(to right, #c0392b, #f7f7f7, #2e7d32);
+	}
+
+	.info-key-labels {
+		display: flex;
+		justify-content: space-between;
+		margin-top: 0.2rem;
+		color: #555;
 	}
 </style>
