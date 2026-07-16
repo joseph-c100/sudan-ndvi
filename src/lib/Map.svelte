@@ -9,6 +9,8 @@
 	interface NdviLayer {
 		id: string;
 		label: string;
+		// optional caption shown above the toggle button
+		caption?: string;
 		// raster tile template, e.g. https://.../{z}/{x}/{y}
 		tileUrl: string;
 	}
@@ -49,12 +51,14 @@
 			{
 				id: 'before',
 				label: 'Jun 2022 – Mar 2023',
+				caption: 'Before conflict',
 				tileUrl:
 					'https://earthengine.googleapis.com/v1/projects/editorial-democraticprimaries/maps/279907af420ce7aa6116c2638b82f33f-48cb9a13544dbc5899343a96eb0ace72/tiles/{z}/{x}/{y}'
 			},
 			{
 				id: 'after',
 				label: 'Oct 2023 – Jun 2026',
+				caption: 'During conflict',
 				tileUrl:
 					'https://earthengine.googleapis.com/v1/projects/editorial-democraticprimaries/maps/94b5f391396ca805155405839a43feab-9000c76df80992db42c75a7f8e87b71d/tiles/{z}/{x}/{y}'
 			}
@@ -284,15 +288,18 @@
 {#if layers.length > 1}
 	<div class="toggle" role="group" aria-label="Choose NDVI period">
 		{#each layers as layer (layer.id)}
-			<button
-				type="button"
-				class="toggle-btn"
-				class:active={layer.id === active}
-				aria-pressed={layer.id === active}
-				onclick={() => selectLayer(layer.id)}
-			>
-				{layer.label}
-			</button>
+			<div class="toggle-item">
+				<span class="toggle-caption">{layer.caption ?? ''}</span>
+				<button
+					type="button"
+					class="toggle-btn"
+					class:active={layer.id === active}
+					aria-pressed={layer.id === active}
+					onclick={() => selectLayer(layer.id)}
+				>
+					{layer.label}
+				</button>
+			</div>
 		{/each}
 	</div>
 {/if}
@@ -321,28 +328,41 @@
 		right: 1rem;
 		z-index: 5;
 		display: flex;
-		background: #fff;
-		overflow: hidden;
+		align-items: flex-end;
+		gap: 0.3rem;
 		font-family:
 			system-ui,
 			-apple-system,
 			sans-serif;
 	}
 
+	.toggle-item {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.toggle-caption {
+		/* reserve the line height so buttons align even with no caption */
+		min-height: 0.95rem;
+		margin-bottom: 0.2rem;
+		font-size: 0.62rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.02em;
+		text-align: center;
+		color: #555;
+	}
+
 	.toggle-btn {
 		appearance: none;
 		border: 1px solid black;
-		background: transparent;
+		background: #fff;
 		padding: 0.5rem 0.85rem;
 		font-size: 0.8rem;
 		font-weight: 600;
 		color: #555;
 		cursor: pointer;
 		white-space: nowrap;
-	}
-
-	.toggle-btn + .toggle-btn {
-		border-left: 1px solid rgba(0, 0, 0, 0.1);
 	}
 
 	.toggle-btn:hover {
@@ -382,15 +402,6 @@
 		margin: 0 0 0.4rem;
 		font-size: 0.8rem;
 		font-weight: 700;
-	}
-
-	.info-layers {
-		margin: 0 0 0.55rem;
-		padding-left: 0.9rem;
-	}
-
-	.info-layers li {
-		margin-bottom: 0.2rem;
 	}
 
 	.info-key-title {
