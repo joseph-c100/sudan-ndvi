@@ -29,10 +29,10 @@
 		bounds?: LngLatBoundsLike;
 		// show the overview minimap in the corner
 		minimap?: boolean;
-		// warm the browser tile cache across these zoom levels before revealing
-		// the map, so panning/zooming is instant. set preload={false} to skip.
+		// warm the browser tile cache in the background so panning/toggling is
+		// instant. set preload={false} to skip.
 		preload?: boolean;
-		// single zoom level whose tiles are cached behind the splash
+		// single zoom level whose tiles are warmed in the background
 		preloadZoom?: number;
 	}
 
@@ -75,12 +75,6 @@
 
 	let container: HTMLDivElement;
 	let map: MapLibreMap | undefined;
-
-	// splash state, driven by the tile-caching pass below
-	let loading = $state(preload);
-	let cached = $state(0);
-	let total = $state(0);
-	let progress = $derived(total > 0 ? Math.round((cached / total) * 100) : 0);
 
 	// id of the currently visible ndvi layer
 	let active = $state(layers[0]?.id);
@@ -129,13 +123,8 @@
 
 	// fetch every tile with a bounded pool so the browser cache is warm before
 	// the user interacts. failures are ignored — a missing tile just isn't cached.
-	// `track` drives the splash progress; pass false for silent background warming.
-	async function warmTileCache(targetLayers: NdviLayer[], track = true) {
+	async function warmTileCache(targetLayers: NdviLayer[]) {
 		const urls = targetLayers.flatMap((layer) => tileUrlsForBounds(layer.tileUrl));
-		if (track) {
-			cached = 0;
-			total = urls.length;
-		}
 		let next = 0;
 		const workers = Array.from({ length: 12 }, async () => {
 			while (next < urls.length) {
@@ -147,7 +136,6 @@
 				} catch {
 					// ignore individual tile failures
 				}
-				if (track) cached++;
 			}
 		});
 		await Promise.all(workers);
@@ -273,20 +261,14 @@
 				});
 			});
 
-			// warm the tile cache, then lift the splash. run it after the map has
-			// been created so both proceed in parallel.
+			// warm the tile cache in the background so panning and toggling are
+			// snappy; this never blocks the map from showing.
 			if (preload) {
 				const activeLayer = layers.find((l) => l.id === active);
-				try {
-					// only the visible layer gates the splash
-					await warmTileCache(activeLayer ? [activeLayer] : layers);
-				} finally {
-					loading = false;
-				}
-				// warm the remaining layers in the background so toggling stays
-				// instant without holding up the splash
-				const rest = layers.filter((l) => l.id !== active);
-				if (rest.length) warmTileCache(rest, false);
+				const ordered = activeLayer
+					? [activeLayer, ...layers.filter((l) => l.id !== active)]
+					: layers;
+				warmTileCache(ordered);
 			}
 		})();
 
@@ -296,7 +278,7 @@
 
 <div class="map" bind:this={container}></div>
 
-{#if !loading && layers.length > 1}
+{#if layers.length > 1}
 	<div class="toggle" role="group" aria-label="Choose NDVI period">
 		{#each layers as layer (layer.id)}
 			<button
@@ -309,23 +291,6 @@
 				{layer.label}
 			</button>
 		{/each}
-	</div>
-{/if}
-
-{#if loading}
-	<div class="splash" role="status" aria-live="polite">
-		<div class="splash-inner">
-			<div class="spinner" aria-hidden="true"></div>
-			<p class="splash-title">Loading satellite imagery</p>
-			<div class="bar">
-				<div class="bar-fill" style="width: {progress}%"></div>
-			</div>
-			<p class="splash-count">
-				{progress}%{#if total > 0}<span class="splash-detail">
-						· {cached} / {total} tiles</span
-					>{/if}
-			</p>
-		</div>
 	</div>
 {/if}
 
@@ -351,7 +316,7 @@
 
 	.toggle-btn {
 		appearance: none;
-		border: none;
+		border: 1px solid black;
 		background: transparent;
 		padding: 0.5rem 0.85rem;
 		font-size: 0.8rem;
@@ -370,83 +335,7 @@
 	}
 
 	.toggle-btn.active {
-		background: #c0392b;
+		background: #000;
 		color: #fff;
-	}
-
-	.splash {
-		position: fixed;
-		inset: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: #f4f4f2;
-		z-index: 10;
-	}
-
-	.splash-inner {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.9rem;
-		width: min(280px, 70vw);
-		text-align: center;
-		font-family:
-			system-ui,
-			-apple-system,
-			sans-serif;
-		color: #1a1a1a;
-	}
-
-	.spinner {
-		width: 2rem;
-		height: 2rem;
-		border: 3px solid rgba(0, 0, 0, 0.12);
-		border-top-color: #c0392b;
-		border-radius: 50%;
-		animation: spin 0.8s linear infinite;
-	}
-
-	.splash-title {
-		margin: 0;
-		font-size: 0.95rem;
-		font-weight: 600;
-	}
-
-	.bar {
-		width: 100%;
-		height: 4px;
-		border-radius: 2px;
-		background: rgba(0, 0, 0, 0.1);
-		overflow: hidden;
-	}
-
-	.bar-fill {
-		height: 100%;
-		background: #c0392b;
-		transition: width 0.2s ease;
-	}
-
-	.splash-count {
-		margin: 0;
-		font-size: 0.8rem;
-		font-variant-numeric: tabular-nums;
-		color: #555;
-	}
-
-	.splash-detail {
-		color: #888;
-	}
-
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.spinner {
-			animation: none;
-		}
 	}
 </style>
